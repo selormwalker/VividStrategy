@@ -2,17 +2,54 @@
 // © selormwalker
 
 //@version=5
-strategy("VividStrategy", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, currency=currency.USD)
+strategy("Vivid Hull-MACD Strategy", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
 
-// --- Inputs ---
-src = input(close, title="Source")
-risk_percent = input.float(1.0, title="Risk Per Trade (%)", minval=0.1, maxval=10.0)
+// --- Hull Suite Inputs ---
+hullLength = input.int(55, "Hull Length", minval=1)
+hullSource = input(close, "Hull Source")
+hullVariation = input.int(2, "Hull Variation (1=HMA, 2=THMA, 3=EHMA)", minval=1, maxval=3)
 
-// --- Logic ---
-// We will implement a new strategy logic here.
+// --- MACD Inputs ---
+fastLength = input.int(12, "MACD Fast Length")
+slowLength = input.int(26, "MACD Slow Length")
+signalSmoothing = input.int(9, "MACD Signal Smoothing")
 
-// --- Plotting ---
-// Visualization of levels and signals will go here.
+// --- Risk Management Inputs ---
+sl_multiplier = input.float(1.5, "Stop Loss (ATR Multiplier)")
+tp_multiplier = input.float(3.0, "Take Profit (ATR Multiplier)")
+
+// --- Hull Suite Calculation ---
+HMA(_src, _length) => ta.wma(2 * ta.wma(_src, _length / 2) - ta.wma(_src, _length), math.round(math.sqrt(_length)))
+EHMA(_src, _length) => ta.ema(2 * ta.ema(_src, _length / 2) - ta.ema(_src, _length), math.round(math.sqrt(_length)))
+THMA(_src, _length) => ta.wma(ta.wma(_src, _length / 3) * 3 - ta.wma(_src, _length / 2) - ta.wma(_src, _length), _length)
+
+hull = hullVariation == 1 ? HMA(hullSource, hullLength) : hullVariation == 2 ? THMA(hullSource, hullLength) : EHMA(hullSource, hullLength)
+
+// --- MACD Calculation ---
+[macdLine, signalLine, _] = ta.macd(close, fastLength, slowLength, signalSmoothing)
+
+// --- Entry/Exit Logic ---
+longCondition = ta.crossover(macdLine, signalLine) and close > hull and hull > hull[1]
+shortCondition = ta.crossunder(macdLine, signalLine) and close < hull and hull < hull[1]
+
+// --- ATR for Risk Management ---
+atr = ta.atr(14)
 
 // --- Strategy Execution ---
-// Entry and Exit conditions will be defined here.
+if (longCondition)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=close - atr * sl_multiplier, limit=close + atr * tp_multiplier)
+
+if (shortCondition)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=close + atr * sl_multiplier, limit=close - atr * tp_multiplier)
+
+// --- Plotting ---
+hullColor = hull > hull[1] ? color.green : color.red
+plot(hull, "Hull Suite", color=color.new(hullColor, 0), linewidth=3)
+
+plotshape(longCondition, "Buy Signal", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(shortCondition, "Sell Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// Background highlighting for trend
+bgcolor(hull > hull[1] ? color.new(color.green, 90) : color.new(color.red, 90))
