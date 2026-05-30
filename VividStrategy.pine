@@ -1,0 +1,18 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © selormwalker
+
+//@version=5
+strategy("VividStrategy", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, currency=currency.USD)
+
+// --- Inputs ---
+src = input(close, title="Source")
+risk_percent = input.float(1.0, title="Risk Per Trade (%)", minval=0.1, maxval=10.0)
+
+// --- Logic ---
+// We will implement a new strategy logic here.
+
+// --- Plotting ---
+// Visualization of levels and signals will go here.
+
+// --- Strategy Execution ---
+// Entry and Exit conditions will be defined here.
